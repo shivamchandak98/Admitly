@@ -1,0 +1,121 @@
+{
+  "theme_and_archetype": {
+    "theme": "light",
+    "archetype_primary": "1 (Organic & Earthy)",
+    "archetype_secondary": "3 (Pastel & Soft)",
+    "reasoning": "For a school admission platform for Indian parents, trust and calm are paramount due to the stressful nature of admissions. Organic & Earthy provides a grounded, trustworthy foundation, while Pastel & Soft ensures the UI feels approachable, modern, and child-adjacent without being overly childish."
+  },
+  "colors": {
+    "background": {
+      "primary": "#FAFAF8",
+      "secondary": "#F0F4F1",
+      "tertiary": "#FFFFFF",
+      "overlay": "bg-black/30"
+    },
+    "text": {
+      "primary": "#1F2937",
+      "secondary": "#4B5563",
+      "tertiary": "#9CA3AF",
+      "on_accent": "#FFFFFF"
+    },
+    "accents": {
+      "primary": "#E07A5F",
+      "primary_hover": "#C96349",
+      "secondary": "#8AB4F8",
+      "success": "#4CAF50",
+      "warning": "#FFB347",
+      "border": "rgba(31, 41, 55, 0.08)"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Outfit, sans-serif",
+      "body": "Manrope, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-none font-bold",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-semibold",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "small_label": "text-xs tracking-[0.2em] uppercase font-semibold text-gray-500"
+    },
+    "rules": [
+      "Headings must use tight letter spacing.",
+      "Overlines and labels must be uppercase with wide tracking.",
+      "Do not center paragraphs; stick to left alignment for readability.",
+      "Maximum heading size is text-6xl."
+    ]
+  },
+  "layout_and_spacing": {
+    "spacing_scale": "Tailwind default extended (p-6, p-8, p-12 for generous whitespace)",
+    "grid_strategy": {
+      "landing_page": "Mode A: Tetris Grid. Asymmetric, grid-cols-1 md:grid-cols-12 with gap-8 to gap-12. Avoid standard 50/50 splits.",
+      "dashboard": "Mode B: Control Room Grid. grid-cols-1 md:grid-cols-3 lg:grid-cols-4 with gap-6. Dense but readable, bento-box style."
+    },
+    "surfaces": [
+      "Dashboard Cards: Flat background (bg-white), crisp 1px border (border-gray-200), rounded-2xl. No heavy shadows by default.",
+      "Sticky Navs: Glassmorphism (backdrop-blur-xl bg-white/70) with a 1px border-b border-gray-200/50.",
+      "Hover States: Subtle lift (-translate-y-1) and ambient shadow (shadow-lg) for interactive cards."
+    ],
+    "container_rules": [
+      "Images must be constrained to max-h-[80vh] on mobile.",
+      "Grid children must be direct children of the grid container.",
+      "Always add internal padding (p-6 or p-8) to elements with borders to prevent text collision."
+    ]
+  },
+  "components": {
+    "navigation": "Sticky top nav with Logo, Links, and Google Login CTA. Glassmorphic background.",
+    "landing_hero": "Split aesthetic: Large expressive typography on the left, organic overlapping image cards on the right. Image overlay maximum bg-black/30.",
+    "school_cards": "Bento-style horizontal or vertical cards showing Image, Rating, Distance, Key Facilities (Icons), and Status.",
+    "dashboard_tracker": "Vertical or horizontal progress stepper (Enquiry -> Form -> Interview -> Offer) using Recharts or custom SVG.",
+    "forms": "Strictly use Shadcn components (Input, Select, Form, Checkbox, Calendar) with customized rounded-xl borders and focus:ring-accent-primary.",
+    "icons": "Use lucide-react for all general icons, keep stroke-width consistent (1.5 or 2).",
+    "modals_dialogs": "Use Shadcn Dialog for quick actions (Upload Document, Schedule Interview) to prevent page navigation.",
+    "testing_attributes": "All interactive elements must include data-testid (e.g., data-testid='login-button')."
+  },
+  "motion_and_interaction": {
+    "transitions": "Use specific properties (transition-transform duration-200 ease-out) rather than transition-all.",
+    "entrance": "Staggered fade-up for list items (schools list, dashboard feed).",
+    "hover": "Explicitly set hover text colors (e.g., hover:bg-gray-900 hover:text-white). Focus states must have higher contrast.",
+    "marquee": "Use a slow organic marquee for school logos or facilities across the landing page, using low contrast backgrounds."
+  },
+  "media": {
+    "rules": [
+      "Never use placeholder URLs. Use the provided images below.",
+      "Use object-cover for all images to maintain aspect ratio.",
+      "Add lazy loading to below-the-fold images."
+    ],
+    "images": {
+      "landing_hero": {
+        "url": "https://images.unsplash.com/photo-1761532276195-5d975abae829?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBzY2hvb2wlMjBjbGFzc3Jvb20lMjBlbXB0eSUyMGdyZWVuJTIwcGxhbnRzJTIwd29vZCUyMGRlc2t8ZW58MHx8fHwxNzc4NDk3NTY2fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Sunlight streams into a modern classroom. Use for hero background or main feature."
+      },
+      "parents_dashboard_hero": {
+        "url": "https://images.unsplash.com/photo-1774438026136-9736ec28922a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjBwYXJlbnQlMjBjaGlsZCUyMHN0dWR5aW5nJTIwdG9nZXRoZXIlMjBoYXBweXxlbnwwfHx8fDE3Nzg0OTc1NjJ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Happy Indian child. Use for dashboard welcome banner or testimonial section."
+      },
+      "school_campus_1": {
+        "url": "https://images.unsplash.com/photo-1695204651916-a300caba0d7e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwzfHxpbmRpYW4lMjBzY2hvb2wlMjBidWlsZGluZyUyMGNhbXB1cyUyMGFyY2hpdGVjdHVyZXxlbnwwfHx8fDE3Nzg0OTc1NjJ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Large white building on a green field. Use for school listing thumbnail."
+      },
+      "school_campus_2": {
+        "url": "https://images.unsplash.com/photo-1640456516695-7c017212c3e8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHw0fHxpbmRpYW4lMjBzY2hvb2wlMjBidWlsZGluZyUyMGNhbXB1cyUyMGFyY2hpdGVjdHVyZXxlbnwwfHx8fDE3Nzg0OTc1NjJ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Red brick building with arches. Use for school listing thumbnail."
+      },
+      "abstract_background": {
+        "url": "https://images.pexels.com/photos/26796497/pexels-photo-26796497.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Abstract fluid pastel shapes. Use for section backgrounds, auth screens, or dashboard blank states."
+      }
+    }
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the color palette. Do not use generic Tailwind blue/indigo.",
+    "Use 'Outfit' for all headings and 'Manrope' for body. Install via Google Fonts.",
+    "In the Parent Dashboard, prioritize narrative over complex charts. Tell the parent exactly what is pending (e.g., 'Upload Aarav\\'s Birth Certificate').",
+    "All cards must have `rounded-2xl` and a subtle 1px border. Do not rely heavily on drop shadows.",
+    "Implement real working Shadcn UI components for tabs, dropdowns, and dialogs. Ensure they are fully accessible.",
+    "Add `data-testid` to all actionable items.",
+    "Ensure generous padding throughout (p-6, p-8) for a clean, premium 'bento' grid feel."
+  ]
+}
