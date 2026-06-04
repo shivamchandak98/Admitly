@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useCity } from "@/context/CityContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Search, Sparkles, FileCheck2, BellRing, ListChecks, Trophy, Music, Cpu, Palette, BookOpen, Star } from "lucide-react";
 import SchoolCard from "@/components/SchoolCard";
+import CitySwitcher from "@/components/CitySwitcher";
 
 const HOLISTIC = [
   { icon: BookOpen, label: "Academics", color: "#E07A5F" },
@@ -14,34 +16,71 @@ const HOLISTIC = [
   { icon: Cpu, label: "Digital", color: "#9F7AEA" },
 ];
 
-const POPULAR_AREAS = [
-  { name: "Bandra Kurla Complex", emoji: "🏙" },
-  { name: "Juhu", emoji: "🌴" },
-  { name: "Powai", emoji: "🏞" },
-  { name: "Thane", emoji: "🌆" },
-  { name: "Andheri East", emoji: "✈" },
-  { name: "Fort", emoji: "🏛" },
-];
+const POPULAR_AREAS = {
+  Mumbai: [
+    { name: "Bandra Kurla Complex", emoji: "🏙" },
+    { name: "Juhu", emoji: "🌴" },
+    { name: "Powai", emoji: "🏞" },
+    { name: "Thane", emoji: "🌆" },
+    { name: "Andheri East", emoji: "✈" },
+    { name: "Fort", emoji: "🏛" },
+  ],
+  Bangalore: [
+    { name: "Indiranagar", emoji: "🌳" },
+    { name: "Whitefield", emoji: "💻" },
+    { name: "Koramangala", emoji: "☕" },
+    { name: "Yelahanka", emoji: "🌿" },
+    { name: "JP Nagar", emoji: "🏘" },
+    { name: "Sarjapur", emoji: "🛣" },
+  ],
+  Delhi: [
+    { name: "Chanakyapuri", emoji: "🏛" },
+    { name: "Vasant Kunj", emoji: "🌆" },
+    { name: "RK Puram", emoji: "🏙" },
+    { name: "Lodi Estate", emoji: "🌿" },
+    { name: "Pitampura", emoji: "🏘" },
+    { name: "Barakhamba Road", emoji: "🛣" },
+  ],
+  Noida: [
+    { name: "Sector 30, Noida", emoji: "🌆" },
+    { name: "Sector 44, Noida", emoji: "🏙" },
+    { name: "Sector 126, Noida", emoji: "🏘" },
+    { name: "Sector 132, Noida", emoji: "🌿" },
+  ],
+  Gurgaon: [
+    { name: "Sector 57, Gurgaon", emoji: "🏙" },
+    { name: "Sohna Road, Gurgaon", emoji: "🛣" },
+    { name: "Aravali Hills, Gurgaon", emoji: "⛰" },
+    { name: "Sector 27, Gurgaon", emoji: "🌆" },
+  ],
+};
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { city } = useCity();
   const [search, setSearch] = useState("");
   const [topSchools, setTopSchools] = useState([]);
   const [openSchools, setOpenSchools] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    api.get("/schools", { params: { sort: "rating", limit: 9 } })
+    api.get("/schools", { params: { city, sort: "rating", limit: 9 } })
       .then((r) => setTopSchools(r.data))
-      .catch(() => {});
-    api.get("/schools", { params: { admission_open: true, sort: "rating", limit: 6 } })
+      .catch(() => setTopSchools([]));
+    api.get("/schools", { params: { city, admission_open: true, sort: "rating", limit: 6 } })
       .then((r) => setOpenSchools(r.data))
+      .catch(() => setOpenSchools([]));
+    api.get("/schools", { params: { city } })
+      .then((r) => setTotalCount(r.data.length))
       .catch(() => {});
-  }, []);
+  }, [city]);
 
   const handleSearch = (e) => {
     e.preventDefault();
     navigate(`/schools${search ? `?search=${encodeURIComponent(search)}` : ""}`);
   };
+
+  const areas = POPULAR_AREAS[city] || [];
 
   return (
     <div className="bg-[#FAFAF8]">
@@ -49,19 +88,22 @@ export default function Landing() {
       <section className="max-w-7xl mx-auto px-6 md:px-8 pt-12 pb-16 md:pt-20 md:pb-24">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12 items-center">
           <div className="md:col-span-7">
-            <div className="text-xs tracking-[0.2em] uppercase font-semibold text-[#E07A5F] mb-5" data-testid="hero-eyebrow">
-              Mumbai · 50+ schools
+            <div className="flex items-center gap-3 mb-5">
+              <div className="text-xs tracking-[0.2em] uppercase font-semibold text-[#E07A5F]" data-testid="hero-eyebrow">
+                {city} · {totalCount || "—"} schools
+              </div>
+              <span className="text-gray-300">•</span>
+              <CitySwitcher compact />
             </div>
             <h1
               className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-none text-gray-900"
               style={{ fontFamily: "Outfit, sans-serif" }}
               data-testid="hero-title"
             >
-              School admissions,{" "}
-              <span className="italic text-[#E07A5F]">finally</span> stress-free.
+              School admissions in <span className="italic text-[#E07A5F]">{city}</span>, finally stress-free.
             </h1>
             <p className="mt-6 text-lg text-gray-600 max-w-xl leading-relaxed">
-              Discover Mumbai schools that nurture the whole child — academics, sports, music and the arts. Compare, shortlist and track every step in one calm dashboard.
+              Discover schools that nurture the whole child — academics, sports, music and the arts. Compare, shortlist and track every step in one calm dashboard.
             </p>
 
             <form onSubmit={handleSearch} className="mt-8 flex items-center gap-2 bg-white border border-gray-200 rounded-2xl p-2 max-w-xl" data-testid="hero-search-form">
@@ -69,7 +111,7 @@ export default function Landing() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Try 'Bandra', 'ICSE', or a school name…"
+                placeholder={`Try a school name, area or 'ICSE'…`}
                 className="border-0 shadow-none focus-visible:ring-0 text-base"
                 data-testid="hero-search-input"
               />
@@ -97,15 +139,15 @@ export default function Landing() {
           </div>
 
           <div className="md:col-span-5 relative">
-            <div className="relative h-[420px]">
+            <div className="relative h-[440px]">
               <img
                 src="https://images.unsplash.com/photo-1571260899304-425eee4c7efc?w=800&q=80&auto=format&fit=crop"
-                alt="Kids playing sports"
-                className="absolute right-0 top-0 w-[78%] h-[280px] object-cover rounded-3xl border border-gray-200 shadow-sm"
+                alt="Indian school children"
+                className="absolute right-0 top-0 w-[78%] h-[300px] object-cover rounded-3xl border border-gray-200 shadow-sm"
               />
               <img
-                src="https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800&q=80&auto=format&fit=crop"
-                alt="Music class"
+                src="https://images.unsplash.com/photo-1774438026136-9736ec28922a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjBwYXJlbnQlMjBjaGlsZCUyMHN0dWR5aW5nJTIwdG9nZXRoZXIlMjBoYXBweXxlbnwwfHx8fDE3Nzg0OTc1NjJ8MA&ixlib=rb-4.1.0&q=85"
+                alt="Indian parent and child"
                 className="absolute left-0 bottom-0 w-[60%] h-[240px] object-cover rounded-3xl border border-gray-200 shadow-lg"
               />
               <div className="absolute right-4 bottom-6 bg-white rounded-2xl border border-gray-200 p-4 shadow-lg w-[240px]">
@@ -126,7 +168,7 @@ export default function Landing() {
         <div className="flex flex-wrap items-end justify-between gap-4 mb-10">
           <div>
             <div className="text-xs tracking-[0.2em] uppercase font-semibold text-gray-500 mb-3 flex items-center gap-2">
-              <Star className="w-3.5 h-3.5 text-[#FFB347] fill-[#FFB347]" /> Top rated in Mumbai
+              <Star className="w-3.5 h-3.5 text-[#FFB347] fill-[#FFB347]" /> Top rated in {city}
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-gray-900 max-w-2xl" style={{ fontFamily: "Outfit, sans-serif" }}>
               The schools parents love the most
@@ -134,44 +176,52 @@ export default function Landing() {
             <p className="text-gray-600 mt-3 max-w-xl">Ranked by Google reviews. Surf the city's best without filling a single form.</p>
           </div>
           <Link to="/schools?sort=rating" className="inline-flex items-center text-sm font-semibold text-[#E07A5F] hover:text-[#C96349]" data-testid="see-all-top">
-            See all 50 schools <ArrowRight className="w-4 h-4 ml-1" />
+            See all {totalCount} schools <ArrowRight className="w-4 h-4 ml-1" />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="top-schools-grid">
-          {topSchools.map((s) => (
-            <SchoolCard key={s.school_id} school={s} />
-          ))}
-        </div>
+        {topSchools.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center text-gray-500">
+            No schools in {city} yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="top-schools-grid">
+            {topSchools.map((s) => (
+              <SchoolCard key={s.school_id} school={s} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* BROWSE BY AREA */}
-      <section className="border-y border-gray-200/70 bg-[#F0F4F1]/40">
-        <div className="max-w-7xl mx-auto px-6 md:px-8 py-14 md:py-20">
-          <div className="text-xs tracking-[0.2em] uppercase font-semibold text-gray-500 mb-3">Surf by neighbourhood</div>
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-gray-900 max-w-2xl" style={{ fontFamily: "Outfit, sans-serif" }}>
-            Find a school closer to home
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-10">
-            {POPULAR_AREAS.map((a) => (
-              <button
-                key={a.name}
-                onClick={() => navigate(`/schools?area=${encodeURIComponent(a.name)}`)}
-                className="bg-white rounded-2xl border border-gray-200 p-5 text-left hover:-translate-y-1 hover:shadow-lg transition-transform duration-200"
-                data-testid={`area-tile-${a.name}`}
-              >
-                <div className="text-2xl mb-2">{a.emoji}</div>
-                <div className="font-semibold text-gray-900 text-sm leading-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-                  {a.name}
-                </div>
-                <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                  Explore <ArrowRight className="w-3 h-3" />
-                </div>
-              </button>
-            ))}
+      {areas.length > 0 && (
+        <section className="border-y border-gray-200/70 bg-[#F0F4F1]/40">
+          <div className="max-w-7xl mx-auto px-6 md:px-8 py-14 md:py-20">
+            <div className="text-xs tracking-[0.2em] uppercase font-semibold text-gray-500 mb-3">Surf by neighbourhood</div>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-gray-900 max-w-2xl" style={{ fontFamily: "Outfit, sans-serif" }}>
+              Find a school closer to home
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-10">
+              {areas.map((a) => (
+                <button
+                  key={a.name}
+                  onClick={() => navigate(`/schools?area=${encodeURIComponent(a.name)}`)}
+                  className="bg-white rounded-2xl border border-gray-200 p-5 text-left hover:-translate-y-1 hover:shadow-lg transition-transform duration-200"
+                  data-testid={`area-tile-${a.name}`}
+                >
+                  <div className="text-2xl mb-2">{a.emoji}</div>
+                  <div className="font-semibold text-gray-900 text-sm leading-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    {a.name}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                    Explore <ArrowRight className="w-3 h-3" />
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ADMISSIONS OPEN NOW */}
       {openSchools.length > 0 && (
@@ -180,7 +230,7 @@ export default function Landing() {
             <div>
               <div className="text-xs tracking-[0.2em] uppercase font-semibold text-[#4CAF50] mb-3">● Admissions open</div>
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-gray-900 max-w-2xl" style={{ fontFamily: "Outfit, sans-serif" }}>
-                Applying right now
+                Applying right now in {city}
               </h2>
             </div>
             <Link to="/schools?admission_open=true" className="inline-flex items-center text-sm font-semibold text-[#E07A5F]" data-testid="see-all-open">
@@ -205,8 +255,8 @@ export default function Landing() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
             {[
-              { icon: ListChecks, title: "Shortlist with confidence", body: "Filter Mumbai schools by area, fees, board, sports, music and digital learning facilities.", testid: "step-shortlist" },
-              { icon: FileCheck2, title: "Track each application", body: "Documents, deadlines, interview dates, notes — every detail in a clean per-child tracker.", testid: "step-track" },
+              { icon: ListChecks, title: "Shortlist with confidence", body: "Filter schools by area, fees, board, sports, music and digital learning facilities.", testid: "step-shortlist" },
+              { icon: FileCheck2, title: "Track each application", body: "Upload documents, set deadlines and interview dates — every detail in a clean per-child tracker.", testid: "step-track" },
               { icon: BellRing, title: "Never miss a date", body: "Set reminders for form deadlines and interviews. We turn admission chaos into clarity.", testid: "step-remind" },
             ].map(({ icon: Icon, title, body, testid }, i) => (
               <div key={i} className="bg-white rounded-2xl border border-gray-200 p-8 transition-transform duration-200 hover:-translate-y-1" data-testid={testid}>
@@ -250,7 +300,7 @@ export default function Landing() {
       </section>
 
       <footer className="border-t border-gray-200 py-10 text-center text-sm text-gray-500">
-        © {new Date().getFullYear()} Admitly · Mumbai School Admissions
+        © {new Date().getFullYear()} Admitly · School Admissions across India
       </footer>
     </div>
   );

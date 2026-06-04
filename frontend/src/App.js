@@ -1,6 +1,7 @@
 import "@/App.css";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
+import { CityProvider } from "@/context/CityContext";
 import Navbar from "@/components/Navbar";
 import AuthCallback from "@/components/AuthCallback";
 import Landing from "@/pages/Landing";
@@ -36,10 +37,12 @@ function App() {
   return (
     <div className="App">
       <BrowserRouter>
-        <AuthProvider>
-          <AppRouter />
-          <Toaster position="top-center" richColors />
-        </AuthProvider>
+        <CityProvider>
+          <AuthProvider>
+            <AppRouter />
+            <Toaster position="top-center" richColors />
+          </AuthProvider>
+        </CityProvider>
       </BrowserRouter>
     </div>
   );

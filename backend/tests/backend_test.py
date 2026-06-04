@@ -32,12 +32,12 @@ def auth_headers(token):
 
 # ---------- Public Schools ----------
 class TestSchools:
-    def test_list_schools_returns_50(self):
+    def test_list_schools_returns_80(self):
         r = requests.get(f"{BASE_URL}/api/schools", timeout=15)
         assert r.status_code == 200
         data = r.json()
         assert isinstance(data, list)
-        assert len(data) == 50
+        assert len(data) == 80
         s = data[0]
         for k in ["school_id", "name", "area", "board", "fees_min", "fees_max", "facilities", "admission_open"]:
             assert k in s
@@ -92,6 +92,145 @@ class TestSchools:
     def test_search(self):
         r = requests.get(f"{BASE_URL}/api/schools", params={"search": "school"}, timeout=15)
         assert r.status_code == 200
+
+
+# ---------- v3: Multi-city ----------
+class TestCities:
+    def test_cities_endpoint(self):
+        r = requests.get(f"{BASE_URL}/api/schools/cities", timeout=15)
+        assert r.status_code == 200
+        data = r.json()
+        cities = {c["city"]: c["count"] for c in data}
+        for expected in ["Mumbai", "Bangalore", "Delhi", "Noida", "Gurgaon"]:
+            assert expected in cities, f"Missing city: {expected}"
+        assert cities["Mumbai"] == 35
+        assert cities["Bangalore"] == 15
+        assert cities["Delhi"] == 10
+        assert cities["Noida"] == 10
+        assert cities["Gurgaon"] == 10
+        assert sum(cities.values()) == 80
+
+    @pytest.mark.parametrize("city,expected_count", [
+        ("Mumbai", 35), ("Bangalore", 15), ("Delhi", 10), ("Noida", 10), ("Gurgaon", 10),
+    ])
+    def test_city_filter(self, city, expected_count):
+        r = requests.get(f"{BASE_URL}/api/schools", params={"city": city}, timeout=15)
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data) == expected_count
+        assert all(s["city"] == city for s in data)
+
+    def test_meta_city_filter(self):
+        r = requests.get(f"{BASE_URL}/api/schools/meta", params={"city": "Mumbai"}, timeout=15)
+        assert r.status_code == 200
+        mumbai_areas = set(r.json()["areas"])
+        r2 = requests.get(f"{BASE_URL}/api/schools/meta", params={"city": "Bangalore"}, timeout=15)
+        bangalore_areas = set(r2.json()["areas"])
+        # Mumbai and Bangalore areas should not overlap
+        assert mumbai_areas.isdisjoint(bangalore_areas), f"Overlap: {mumbai_areas & bangalore_areas}"
+        assert len(mumbai_areas) > 0
+        assert len(bangalore_areas) > 0
+
+
+# ---------- v3: Document uploads ----------
+class TestDocumentUploads:
+    @pytest.fixture(scope="class")
+    def app_with_docs(self, auth_headers):
+        sid = requests.get(f"{BASE_URL}/api/schools", params={"city": "Mumbai"}, timeout=15).json()[0]["school_id"]
+        r = requests.post(f"{BASE_URL}/api/applications", headers=auth_headers,
+                          json={"school_id": sid, "child_name": "TEST_Upload", "grade_applying": "Grade 1"}, timeout=15)
+        assert r.status_code == 200
+        app = r.json()
+        yield app
+        # cleanup
+        try:
+            requests.delete(f"{BASE_URL}/api/applications/{app['application_id']}", headers=auth_headers, timeout=15)
+        except Exception:
+            pass
+
+    def test_upload_requires_auth(self, app_with_docs):
+        app = app_with_docs
+        doc_id = app["documents"][0]["doc_id"]
+        files = {"file": ("test.txt", b"hello", "text/plain")}
+        r = requests.post(
+            f"{BASE_URL}/api/applications/{app['application_id']}/documents/{doc_id}/upload",
+            files=files, timeout=20,
+        )
+        assert r.status_code == 401
+
+    def test_upload_app_not_found(self, token):
+        files = {"file": ("test.txt", b"hello", "text/plain")}
+        r = requests.post(
+            f"{BASE_URL}/api/applications/app_bogus/documents/dxx/upload",
+            files=files, headers={"Authorization": f"Bearer {token}"}, timeout=20,
+        )
+        assert r.status_code == 404
+
+    def test_upload_doc_not_found(self, app_with_docs, token):
+        app = app_with_docs
+        files = {"file": ("test.txt", b"hello", "text/plain")}
+        r = requests.post(
+            f"{BASE_URL}/api/applications/{app['application_id']}/documents/bogus_doc/upload",
+            files=files, headers={"Authorization": f"Bearer {token}"}, timeout=20,
+        )
+        assert r.status_code == 404
+
+    def test_upload_too_large(self, app_with_docs, token):
+        app = app_with_docs
+        doc_id = app["documents"][0]["doc_id"]
+        big = b"x" * (8 * 1024 * 1024 + 100)
+        files = {"file": ("big.bin", big, "application/octet-stream")}
+        r = requests.post(
+            f"{BASE_URL}/api/applications/{app['application_id']}/documents/{doc_id}/upload",
+            files=files, headers={"Authorization": f"Bearer {token}"}, timeout=60,
+        )
+        assert r.status_code == 413
+
+    def test_upload_download_delete_flow(self, app_with_docs, token):
+        app = app_with_docs
+        # use second doc to avoid collision with too-large test
+        doc_id = app["documents"][1]["doc_id"]
+        content = b"%PDF-1.4 fake pdf content for testing\n" * 50
+        files = {"file": ("birth_cert.pdf", content, "application/pdf")}
+        # UPLOAD
+        r = requests.post(
+            f"{BASE_URL}/api/applications/{app['application_id']}/documents/{doc_id}/upload",
+            files=files, headers={"Authorization": f"Bearer {token}"}, timeout=60,
+        )
+        assert r.status_code == 200, r.text
+        updated = r.json()
+        doc = next(d for d in updated["documents"] if d["doc_id"] == doc_id)
+        assert doc["status"] == "ready"
+        assert doc["file_name"] == "birth_cert.pdf"
+        assert doc["file_size"] == len(content)
+        assert doc["storage_path"]
+        assert doc["content_type"] == "application/pdf"
+
+        # DOWNLOAD via auth query param
+        r2 = requests.get(
+            f"{BASE_URL}/api/applications/{app['application_id']}/documents/{doc_id}/file",
+            params={"auth": token}, timeout=30,
+        )
+        assert r2.status_code == 200, r2.text
+        assert r2.content == content
+        assert "pdf" in r2.headers.get("content-type", "").lower()
+
+        # DELETE
+        r3 = requests.delete(
+            f"{BASE_URL}/api/applications/{app['application_id']}/documents/{doc_id}/file",
+            headers={"Authorization": f"Bearer {token}"}, timeout=20,
+        )
+        assert r3.status_code == 200
+
+        # Verify cleared
+        r4 = requests.get(f"{BASE_URL}/api/applications", headers={"Authorization": f"Bearer {token}"}, timeout=15)
+        refreshed = next(a for a in r4.json() if a["application_id"] == app["application_id"])
+        doc2 = next(d for d in refreshed["documents"] if d["doc_id"] == doc_id)
+        assert doc2["status"] == "pending"
+        assert doc2["file_name"] is None
+        assert doc2["storage_path"] is None
+        assert doc2["file_size"] is None
+
 
 
 # ---------- Auth ----------

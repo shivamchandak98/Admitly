@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Heart, LayoutDashboard, LogOut, GraduationCap } from "lucide-react";
+import CitySwitcher from "@/components/CitySwitcher";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,7 +32,7 @@ export default function Navbar() {
             <div className="font-bold text-gray-900 text-lg" style={{ fontFamily: "Outfit, sans-serif" }}>
               Admitly
             </div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 -mt-0.5">Mumbai Schools</div>
+            <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500 -mt-0.5">School Admissions</div>
           </div>
         </Link>
 
@@ -52,6 +53,7 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
+          <CitySwitcher compact />
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

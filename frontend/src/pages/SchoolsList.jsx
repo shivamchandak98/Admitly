@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useCity } from "@/context/CityContext";
 import SchoolCard from "@/components/SchoolCard";
+import CitySwitcher from "@/components/CitySwitcher";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -30,6 +32,7 @@ const FACILITIES = [
 export default function SchoolsList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const { city } = useCity();
   const [schools, setSchools] = useState([]);
   const [meta, setMeta] = useState({ areas: [], boards: [] });
   const [favIds, setFavIds] = useState([]);
@@ -58,8 +61,8 @@ export default function SchoolsList() {
   }, [user]);
 
   useEffect(() => {
-    api.get("/schools/meta").then((r) => setMeta(r.data)).catch(() => {});
-  }, []);
+    api.get("/schools/meta", { params: { city } }).then((r) => setMeta(r.data)).catch(() => {});
+  }, [city]);
 
   useEffect(() => {
     loadFavs();
@@ -67,7 +70,7 @@ export default function SchoolsList() {
 
   useEffect(() => {
     setLoading(true);
-    const params = {};
+    const params = { city };
     if (search) params.search = search;
     if (area) params.area = area;
     if (board) params.board = board;
@@ -77,7 +80,7 @@ export default function SchoolsList() {
     api.get("/schools", { params })
       .then((r) => setSchools(r.data))
       .finally(() => setLoading(false));
-  }, [search, area, board, facility, feesMax, openOnly]);
+  }, [city, search, area, board, facility, feesMax, openOnly]);
 
   const toggleFav = async (school_id) => {
     if (!user) {
@@ -101,12 +104,15 @@ export default function SchoolsList() {
   return (
     <div className="bg-[#FAFAF8] min-h-screen">
       <div className="max-w-7xl mx-auto px-6 md:px-8 py-10">
-        <div className="mb-8">
-          <div className="text-xs tracking-[0.2em] uppercase font-semibold text-gray-500 mb-3">Browse Mumbai</div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-gray-900" style={{ fontFamily: "Outfit, sans-serif" }} data-testid="schools-page-title">
-            All schools
-          </h1>
-          <p className="text-gray-600 mt-3">Filter by area, fees, board and facilities. Save your favourites to track them.</p>
+        <div className="mb-8 flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <div className="text-xs tracking-[0.2em] uppercase font-semibold text-gray-500 mb-3">Browse {city}</div>
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-gray-900" style={{ fontFamily: "Outfit, sans-serif" }} data-testid="schools-page-title">
+              All schools
+            </h1>
+            <p className="text-gray-600 mt-3">Filter by area, fees, board and facilities. Save your favourites to track them.</p>
+          </div>
+          <CitySwitcher />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, GraduationCap, Plus, Sparkles, Trash2, CheckCircle2, Clock } from "lucide-react";
+import { Calendar, GraduationCap, Plus, Sparkles, Trash2, CheckCircle2, Clock, Paperclip } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -232,11 +232,47 @@ function ApplicationDialog({ application, onClose, onSaved }) {
     reminder_date: application.reminder_date || "",
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingId, setUploadingId] = useState(null);
 
   const toggleDoc = (idx) => {
     const docs = [...form.documents];
     docs[idx] = { ...docs[idx], status: docs[idx].status === "ready" ? "pending" : "ready" };
     setForm({ ...form, documents: docs });
+  };
+
+  const uploadFile = async (idx, file) => {
+    if (!file) return;
+    const doc = form.documents[idx];
+    setUploadingId(doc.doc_id);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await api.post(
+        `/applications/${application.application_id}/documents/${doc.doc_id}/upload`,
+        fd,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      setForm((f) => ({ ...f, documents: res.data.documents }));
+      toast.success(`Uploaded ${file.name}`);
+    } catch (e) {
+      const msg = e?.response?.data?.detail || "Upload failed";
+      toast.error(msg);
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  const removeFile = async (idx) => {
+    const doc = form.documents[idx];
+    try {
+      await api.delete(`/applications/${application.application_id}/documents/${doc.doc_id}/file`);
+      const docs = [...form.documents];
+      docs[idx] = { ...doc, file_id: null, file_name: null, file_size: null, storage_path: null, content_type: null, status: "pending" };
+      setForm({ ...form, documents: docs });
+      toast.success("File removed");
+    } catch {
+      toast.error("Failed to remove file");
+    }
   };
 
   const save = async () => {
@@ -251,6 +287,8 @@ function ApplicationDialog({ application, onClose, onSaved }) {
       setSaving(false);
     }
   };
+
+  const formatSize = (b) => (b > 1024 * 1024 ? `${(b / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
   return (
     <Dialog open={true} onOpenChange={(v) => !v && onClose()}>
@@ -295,17 +333,47 @@ function ApplicationDialog({ application, onClose, onSaved }) {
           </div>
 
           <div>
-            <Label>Documents checklist</Label>
+            <Label>Documents</Label>
             <div className="mt-2 space-y-2 border border-gray-200 rounded-xl p-3">
               {form.documents.map((d, idx) => (
-                <label key={d.doc_id || idx} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-[#F0F4F1] transition-colors" data-testid={`doc-${idx}`}>
+                <div key={d.doc_id || idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#F0F4F1] transition-colors" data-testid={`doc-${idx}`}>
                   <Checkbox checked={d.status === "ready"} onCheckedChange={() => toggleDoc(idx)} />
-                  <span className={`text-sm ${d.status === "ready" ? "line-through text-gray-400" : "text-gray-800"}`}>
-                    {d.name}
-                  </span>
-                </label>
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm ${d.status === "ready" && !d.file_id ? "line-through text-gray-400" : "text-gray-800 font-medium"}`}>
+                      {d.name}
+                    </div>
+                    {d.file_name && (
+                      <div className="text-xs text-gray-500 truncate flex items-center gap-1.5">
+                        <Paperclip className="w-3 h-3" /> {d.file_name}
+                        {d.file_size ? <span className="text-gray-400">· {formatSize(d.file_size)}</span> : null}
+                      </div>
+                    )}
+                  </div>
+                  {d.file_id ? (
+                    <button
+                      onClick={() => removeFile(idx)}
+                      className="text-xs text-rose-600 hover:underline"
+                      data-testid={`remove-file-${idx}`}
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <label className="text-xs font-semibold text-[#E07A5F] hover:text-[#C96349] cursor-pointer" data-testid={`upload-trigger-${idx}`}>
+                      {uploadingId === d.doc_id ? "Uploading…" : "Upload"}
+                      <input
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={(e) => uploadFile(idx, e.target.files?.[0])}
+                        disabled={uploadingId === d.doc_id}
+                        data-testid={`upload-input-${idx}`}
+                      />
+                    </label>
+                  )}
+                </div>
               ))}
             </div>
+            <p className="text-[11px] text-gray-500 mt-1.5">PDF, JPG, PNG up to 8 MB. Files are private to your account.</p>
           </div>
 
           <div>

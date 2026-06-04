@@ -110,7 +110,7 @@ export default function SchoolDetail() {
               {school.name}
             </h1>
             <div className="flex flex-wrap items-center gap-4 mt-3 text-sm">
-              <span className="inline-flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {school.area}</span>
+              <span className="inline-flex items-center gap-1.5"><MapPin className="w-4 h-4" /> {school.area}{school.city ? `, ${school.city}` : ""}</span>
               <span className="inline-flex items-center gap-1.5">
                 <Star className="w-4 h-4 fill-[#FFB347] text-[#FFB347]" /> {school.rating}
                 <span className="opacity-75">({school.google_reviews_count?.toLocaleString?.("en-IN")} Google reviews)</span>

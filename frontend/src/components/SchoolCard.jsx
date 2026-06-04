@@ -61,7 +61,7 @@ export default function SchoolCard({ school, isFavourite, onToggleFavourite }) {
 
         <div className="flex items-center gap-1.5 text-sm text-gray-500 mb-3">
           <MapPin className="w-3.5 h-3.5" />
-          {school.area} · <span className="text-gray-700 font-medium">{school.board}</span>
+          {school.area}{school.city ? `, ${school.city}` : ""} · <span className="text-gray-700 font-medium">{school.board}</span>
         </div>
 
         <div className="flex items-center gap-3 mb-3 text-sm">

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Cookie, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Cookie, Header, UploadFile, File, Query
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -28,6 +28,45 @@ logger = logging.getLogger(__name__)
 
 EMERGENT_AUTH_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 
+# ---------- Object Storage ----------
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+APP_NAME = "admitly"
+_storage_key: Optional[str] = None
+
+
+def init_storage():
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_KEY:
+        raise RuntimeError("EMERGENT_LLM_KEY not configured")
+    resp = http_requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
+    resp.raise_for_status()
+    _storage_key = resp.json()["storage_key"]
+    return _storage_key
+
+
+def storage_put(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    resp = http_requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data, timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def storage_get(path: str):
+    key = init_storage()
+    resp = http_requests.get(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key}, timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
 
 # ---------- Models ----------
 class User(BaseModel):
@@ -40,6 +79,7 @@ class User(BaseModel):
 class School(BaseModel):
     school_id: str
     name: str
+    city: str
     area: str
     board: str
     fees_min: int
@@ -62,6 +102,11 @@ class ApplicationDocument(BaseModel):
     name: str
     status: str = "pending"  # pending | ready | submitted
     note: Optional[str] = ""
+    file_id: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    storage_path: Optional[str] = None
+    content_type: Optional[str] = None
 
 
 class Application(BaseModel):
@@ -151,6 +196,11 @@ async def seed_schools():
         if docs:
             await db.schools.insert_many(docs)
             logger.info(f"Seeded {len(docs)} schools")
+    try:
+        init_storage()
+        logger.info("Object storage initialized")
+    except Exception as e:
+        logger.warning(f"Storage init deferred: {e}")
 
 
 # ---------- Auth Endpoints ----------
@@ -240,16 +290,19 @@ async def logout(
 # ---------- Schools Endpoints ----------
 @api_router.get("/schools", response_model=List[School])
 async def list_schools(
+    city: Optional[str] = None,
     area: Optional[str] = None,
     board: Optional[str] = None,
     facility: Optional[str] = None,
     fees_max: Optional[int] = None,
     search: Optional[str] = None,
     admission_open: Optional[bool] = None,
-    sort: Optional[str] = None,  # "rating" | "fees_asc" | "fees_desc"
+    sort: Optional[str] = None,
     limit: Optional[int] = None,
 ):
     q = {}
+    if city:
+        q["city"] = city
     if area:
         q["area"] = area
     if board:
@@ -264,6 +317,7 @@ async def list_schools(
         q["$or"] = [
             {"name": {"$regex": search, "$options": "i"}},
             {"area": {"$regex": search, "$options": "i"}},
+            {"city": {"$regex": search, "$options": "i"}},
         ]
     cursor = db.schools.find(q, {"_id": 0})
     if sort == "rating":
@@ -276,10 +330,18 @@ async def list_schools(
     return schools
 
 
+@api_router.get("/schools/cities")
+async def list_cities():
+    pipeline = [{"$group": {"_id": "$city", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}]
+    rows = await db.schools.aggregate(pipeline).to_list(50)
+    return [{"city": r["_id"], "count": r["count"]} for r in rows]
+
+
 @api_router.get("/schools/meta")
-async def schools_meta():
-    areas = await db.schools.distinct("area")
-    boards = await db.schools.distinct("board")
+async def schools_meta(city: Optional[str] = None):
+    q = {"city": city} if city else {}
+    areas = await db.schools.distinct("area", q)
+    boards = await db.schools.distinct("board", q)
     return {"areas": sorted(areas), "boards": sorted(boards), "facilities": ["sports", "music", "digital", "drama", "swimming", "library", "art"]}
 
 
@@ -380,6 +442,112 @@ async def delete_application(
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
     return {"ok": True}
+
+
+# ---------- Document Uploads (Object Storage) ----------
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024  # 8 MB
+
+
+@api_router.post("/applications/{application_id}/documents/{doc_id}/upload")
+async def upload_document_file(
+    application_id: str,
+    doc_id: str,
+    file: UploadFile = File(...),
+    session_token: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    user = await get_current_user(session_token, authorization)
+    app_doc = await db.applications.find_one({"application_id": application_id, "user_id": user.user_id}, {"_id": 0})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+    docs = app_doc.get("documents") or []
+    idx = next((i for i, d in enumerate(docs) if d.get("doc_id") == doc_id), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Document slot not found")
+
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 8MB)")
+    ext = (file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "bin").lower()
+    file_id = uuid.uuid4().hex
+    path = f"{APP_NAME}/uploads/{user.user_id}/{file_id}.{ext}"
+    try:
+        result = storage_put(path, data, file.content_type or "application/octet-stream")
+    except Exception as e:
+        logger.error(f"Upload failed: {e}")
+        raise HTTPException(status_code=502, detail="Upload failed")
+
+    docs[idx] = {
+        **docs[idx],
+        "status": "ready",
+        "file_id": file_id,
+        "file_name": file.filename,
+        "file_size": len(data),
+        "storage_path": result["path"],
+        "content_type": file.content_type,
+    }
+    await db.applications.update_one(
+        {"application_id": application_id},
+        {"$set": {"documents": docs, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    refreshed = await db.applications.find_one({"application_id": application_id}, {"_id": 0})
+    return refreshed
+
+
+@api_router.delete("/applications/{application_id}/documents/{doc_id}/file")
+async def delete_document_file(
+    application_id: str,
+    doc_id: str,
+    session_token: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    user = await get_current_user(session_token, authorization)
+    app_doc = await db.applications.find_one({"application_id": application_id, "user_id": user.user_id}, {"_id": 0})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+    docs = app_doc.get("documents") or []
+    idx = next((i for i, d in enumerate(docs) if d.get("doc_id") == doc_id), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Document slot not found")
+    docs[idx] = {
+        **docs[idx],
+        "status": "pending",
+        "file_id": None,
+        "file_name": None,
+        "file_size": None,
+        "storage_path": None,
+        "content_type": None,
+    }
+    await db.applications.update_one(
+        {"application_id": application_id},
+        {"$set": {"documents": docs, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return {"ok": True}
+
+
+@api_router.get("/applications/{application_id}/documents/{doc_id}/file")
+async def download_document_file(
+    application_id: str,
+    doc_id: str,
+    session_token: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+    auth: Optional[str] = Query(default=None),
+):
+    if not authorization and auth:
+        authorization = f"Bearer {auth}"
+    user = await get_current_user(session_token, authorization)
+    app_doc = await db.applications.find_one({"application_id": application_id, "user_id": user.user_id}, {"_id": 0})
+    if not app_doc:
+        raise HTTPException(status_code=404, detail="Application not found")
+    doc = next((d for d in (app_doc.get("documents") or []) if d.get("doc_id") == doc_id), None)
+    if not doc or not doc.get("storage_path"):
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        data, ct = storage_get(doc["storage_path"])
+    except Exception as e:
+        logger.error(f"Download failed: {e}")
+        raise HTTPException(status_code=502, detail="Download failed")
+    return Response(content=data, media_type=doc.get("content_type") or ct)
 
 
 # ---------- Favourites ----------
