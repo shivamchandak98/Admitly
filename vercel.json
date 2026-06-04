@@ -4,10 +4,7 @@
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build",
-        "installCommand": "npm install --legacy-peer-deps"
-      }
+      "config": { "distDir": "build" }
     },
     {
       "src": "backend/server.py",
